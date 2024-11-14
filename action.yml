@@ -1,0 +1,41 @@
+name: 'EC2 Runner Details'
+description: 'Displays EC2 instance details and connection information'
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      run: |
+        TOKEN_URL="http://169.254.169.254/latest/api/token"
+        INSTANCE_URL="http://169.254.169.254/latest/meta-data/instance-id"
+        REGION_URL="http://169.254.169.254/latest/meta-data/placement/region"
+        CONSOLE_HOST="console.aws.amazon.com"
+
+        TOKEN=$(curl \
+          -X PUT "$TOKEN_URL" \
+          -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null
+        )
+
+        function query_instance_metadata {
+          url="$1"
+          curl -s -H "X-aws-ec2-metadata-token: $TOKEN" "$url"
+        }
+
+        INSTANCE_ID=$(query_instance_metadata "$INSTANCE_URL")
+        REGION=$(query_instance_metadata "$REGION_URL")
+
+        INSTANCE_DETAILS="https://$CONSOLE_HOST/ec2/home\
+        ?region=$REGION#InstanceDetails:instanceId=$INSTANCE_ID"
+
+        INSTANCE_CONNECT="https://$CONSOLE_HOST/ec2-instance-connect/ssh\
+        ?region=$REGION\
+        &connType=standard\
+        &instanceId=$INSTANCE_ID\
+        &osUser=root\
+        &sshPort=22\
+        &addressFamily=ipv4"
+
+        echo "## EC2 Instance Details
+         - [Instance Details]($INSTANCE_DETAILS)
+         - [Connect]($INSTANCE_CONNECT)
+           - \`cd\` into \`$(pwd)\`"
